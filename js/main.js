@@ -5,7 +5,53 @@
  */
 
 // Storage Controller
+const StorageCtrl = (function() {
+	// Public methods
+	return {
+		storeItem: function(item) {
+			let items;
+			// Check to see any items in LS
+			if(localStorage.getItem('items') === null) {
+				items = [];
+				// Push new item
+				items.push(item);
+				// Set LS
+				localStorage.setItem('items', JSON.stringify(items));
+			} else {
+				// Get what is already in LS
+				items = JSON.parse(localStorage.getItem('items'));
 
+				// Push new item
+				items.push(item);
+
+				// Re-set LS
+				localStorage.setItem('items', JSON.stringify(items));
+			}
+		},
+		getItemsFromStorage: function() {
+			let items;
+			if(localStorage.getItem('items') === null) {
+				items = [];
+			} else {
+				items = JSON.parse(localStorage.getItem('items'));
+			}
+			return items;
+		},
+		deleteItemFromStorage: function(url) {
+			let items = JSON.parse(localStorage.getItem('items'));
+
+			items.forEach((item, index) => {
+				if(url === item.url) {
+					// Delete at index
+					items.splice(index, 1);
+				}
+			});
+			// Re-set LS
+			localStorage.setItem('items', JSON.stringify(items));
+		}
+	}
+
+})();
 
 // Item Controller
 const ItemCtrl = (function() {
@@ -17,10 +63,11 @@ const ItemCtrl = (function() {
 
 	// Data structure
 	const data = {
-		items: [
-			// {site: 'Facebook', url: 'http://www.facebook.com'},
-			// {site: 'Twitter', url: 'http://www.twitter.com'}
-		]
+		// items: [
+		// 	{site: 'Facebook', url: 'http://www.facebook.com'},
+		// 	{site: 'Twitter', url: 'http://www.twitter.com'}
+		// ]
+		items: StorageCtrl.getItemsFromStorage()
 	}
 
 	// Public Methods
@@ -44,6 +91,10 @@ const ItemCtrl = (function() {
 			const index = urls.indexOf(url);
 			// Remove item
 			data.items.splice(index, 1);
+
+			if(data.items.length === 0) {
+				UICtrl.hideList();
+			}
 		}
 	}
 })();
@@ -55,6 +106,7 @@ const UICtrl = (function() {
 		siteInput: '#siteName',
 		urlInput: '#siteUrl',
 		addBtn: '.add-item-btn',
+		bookmarkResultsCard: '#bookmarksResults',
 		bookmarkResultsUL: '.url-results-list'
 	}
 
@@ -80,12 +132,38 @@ const UICtrl = (function() {
 					<a href="#" class="btn btn-danger delete-btn">Delete</a>
 				</h4>
 			</li>
-			`;	
+			`;
+			
+			// un-hide list from init when adding item
+			document.querySelector(UISelectors.bookmarkResultsCard).style.display = 'block';
 		},
 		deleteListItem: function(target) {
 			if(target.classList.contains('delete-btn')) {
 				target.parentElement.parentElement.remove();
 			}
+		},
+		populateUrlList: function(items) {
+			let html = '';
+			items.forEach(item => {
+				html += `
+				<li class="list-group-item">
+					<h4 class="">${item.site} 
+						<a href="${item.url}" class="btn btn-default" target="_blank">Visit</a>
+						<a href="#" class="btn btn-danger delete-btn">Delete</a>
+					</h4>
+				</li>
+				`
+			});
+
+			// Insert List items
+			document.querySelector(UISelectors.bookmarkResultsUL).innerHTML = html;
+		},
+		hideList: function() {
+			document.querySelector(UISelectors.bookmarkResultsCard).style.display = 'none';
+		},
+		clearInput: function() {
+			document.querySelector(UISelectors.siteInput).value = '';
+			document.querySelector(UISelectors.urlInput).value = '';
 		}
 	}
 })();
@@ -125,23 +203,33 @@ const App = (function(ItemCtrl, UICtrl) {
 
 		// Add item to UI
 		UICtrl.addListItem(newItem);
+
+		// Add item to LS
+		StorageCtrl.storeItem(newItem);
+
+		// Clear fields
+		UICtrl.clearInput();
 	}
 
 	// Delete item submit
 	const itemDeleteSubmit = function(e) {
+		// let itemUrl;
 		// Find url by way of previous sibling of delete button
-		const itemUrl = e.target.previousElementSibling.getAttribute('href');
+		if(e.target.classList.contains('delete-btn')) {
+			const itemUrl = e.target.previousElementSibling.getAttribute('href');
 
-		// Delete from data structure
-		ItemCtrl.deleteItem(itemUrl);
+			// Delete from data structure
+			ItemCtrl.deleteItem(itemUrl);
+
+			// Delete list from UI
+			UICtrl.deleteListItem(e.target);
+
+			// Delete item from LS
+			StorageCtrl.deleteItemFromStorage(itemUrl);
+		}
 
 		// +++++++ need to add unique Ids to items. Problem is that if we have repeated urls throughout the data structure, the indexOf will delete the first one that it finds (so not necessarily the correct one)
 		// +++++++
-		
-		// Delete list from UI
-		UICtrl.deleteListItem(e.target);
-		
-		
 	}
 
 	// Validate form data
@@ -172,7 +260,14 @@ const App = (function(ItemCtrl, UICtrl) {
 	// Public Methods
 	return {
 		init: function() {
-			console.log("I'm Running!");
+			// Fetch items from data structure
+			const items = ItemCtrl.getItems();
+			if(items.length === 0) {
+				UICtrl.hideList();
+			} else {
+				// Show list loaded from data structure
+				UICtrl.populateUrlList(items);
+			}
 
 			// Load Event Listeners
 			loadEventListeners();
