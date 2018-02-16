@@ -8,7 +8,7 @@
 const StorageCtrl = (function() {
 	// Public methods
 	return {
-		storeItem: function(item) {
+	    storeItem: function(item) {
 			let items;
 			// Check to see any items in LS
 			if(localStorage.getItem('items') === null) {
